@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: #F7F8F7;
+    --color-fg: #292D32;
+  }
+
+  .dark {
+    --color-bg: #292D32;
+    --color-fg: #F1F3F2;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Custom subtle scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #B4B6B7;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #495059;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #168E6A;
+}
+
+/* Leaflet map customization */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 1.5rem;
+  background-color: #F7F8F7 !important;
+  font-family: inherit;
+  z-index: 1;
+}
+
+.dark .leaflet-container {
+  background-color: #292D32 !important;
+}
+
+.dark .leaflet-tile-pane {
+  filter: brightness(0.85) invert(1) contrast(1.05) hue-rotate(130deg) saturate(0.3);
+}
+
+.leaflet-popup-content-wrapper {
+  background-color: #FFFFFF !important;
+  color: #292D32 !important;
+  border-radius: 1.25rem !important;
+  box-shadow: 0 16px 32px -6px rgba(41, 45, 50, 0.12) !important;
+  border: 1px solid #EAECEA !important;
+  padding: 2px !important;
+}
+
+.dark .leaflet-popup-content-wrapper {
+  background-color: #33383F !important;
+  color: #F1F3F2 !important;
+  border: 1px solid #495059 !important;
+  box-shadow: 0 16px 32px -6px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-popup-tip {
+  background-color: #FFFFFF !important;
+  border: 1px solid #EAECEA !important;
+}
+
+.dark .leaflet-popup-tip {
+  background-color: #33383F !important;
+  border: 1px solid #495059 !important;
+}
+
+.leaflet-popup-content {
+  margin: 12px 16px !important;
+  line-height: 1.4 !important;
+}
+
+/* Custom Marker Styling */
+.custom-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+
+.custom-marker:hover {
+  transform: scale(1.12);
+  z-index: 999 !important;
+}
+
+/* Subtle driver marker pulse in warm yellow */
+@keyframes driverPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(251, 176, 59, 0.75);
+  }
+
+  70% {
+    box-shadow: 0 0 0 14px rgba(251, 176, 59, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 176, 59, 0);
+  }
+}
+
+.driver-marker-pulse {
+  animation: driverPulse 2s infinite;
+}
