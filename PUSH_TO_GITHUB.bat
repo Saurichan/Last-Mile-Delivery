@@ -2,11 +2,11 @@
 title Push Project to GitHub
 color 0A
 echo ===================================================
-echo   PUSHING ALL SOURCE FILES TO GITHUB (Last-Mile)
+echo   PUSHING ALL SOURCE FILES TO GITHUB (Last-Mile-Delivery)
 echo ===================================================
 echo.
 cd /d "%~dp0"
-echo Target Repository: https://github.com/praveenmalviya8899/Last-Mile
+echo Target Repository: https://github.com/Saurichan/Last-Mile-Delivery
 echo Branch: main
 echo.
 echo Staging and committing changes...
