@@ -20,6 +20,7 @@ import { CookieConsent } from './components/common/CookieConsent';
 import { AuthView } from './components/auth/AuthView';
 import { Order } from './types';
 import { initAuthListener } from './services/authService';
+import { subscribeToRealtimeOrders } from './services/orderService';
 
 export const App: React.FC = () => {
   const { activeRole, theme, isAuthenticated } = useStore();
@@ -32,6 +33,27 @@ export const App: React.FC = () => {
     const unsubscribe = initAuthListener();
     return () => {
       unsubscribe();
+    };
+  }, []);
+
+  // Sync orders with Supabase on mount and listen to Realtime changes
+  useEffect(() => {
+    useStore.getState().syncOrdersFromSupabase();
+
+    const unsubscribeOrders = subscribeToRealtimeOrders(
+      (newOrder) => {
+        useStore.getState().upsertRealtimeOrder(newOrder);
+      },
+      (updatedOrder) => {
+        useStore.getState().upsertRealtimeOrder(updatedOrder);
+      },
+      (deletedId) => {
+        useStore.getState().removeRealtimeOrder(deletedId);
+      }
+    );
+
+    return () => {
+      unsubscribeOrders();
     };
   }, []);
 

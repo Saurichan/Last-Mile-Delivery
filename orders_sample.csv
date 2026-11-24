@@ -1,0 +1,9 @@
+order_number,customer_name,phone,email,address,lat,lng,category,weight_kg,package_count,priority,time_window_start,time_window_end,service_time_minutes
+ORD-1001,Rajesh Kumar,9876543210,rajesh@example.com,MG Road Tumakuru,13.3421,77.1025,Bakery,2.5,2,critical,09:00,10:30,5
+ORD-1002,Priya Sharma,9876543211,priya@example.com,Ashok Nagar Tumakuru,13.3378,77.1082,Bakery,1.2,1,high,09:30,11:00,4
+ORD-1003,Anil Gowda,9876543212,anil@example.com,SIT Main Road Tumakuru,13.3295,77.1240,Bakery,3.0,3,normal,10:00,12:00,5
+ORD-1004,Sunita Patil,9876543213,sunita@example.com,SS Puram Tumakuru,13.3470,77.0995,Bakery,0.8,1,normal,10:30,12:30,3
+ORD-1005,Vikram Hegde,9876543214,vikram@example.com,Batawadi Tumakuru,13.3512,77.1120,Bakery,4.5,4,flexible,11:00,14:00,6
+ORD-1006,Deepa Rao,9876543215,deepa@example.com,Kyathsandra Tumakuru,13.3180,77.1350,Bakery,2.0,2,high,09:00,11:30,4
+ORD-1007,Mahesh Naik,9876543216,mahesh@example.com,Gubbi Gate Tumakuru,13.3390,77.0910,Bakery,1.5,1,normal,10:00,13:00,4
+ORD-1008,Kavitha Reddy,9876543217,kavitha@example.com,Belagumba Tumakuru,13.3580,77.1050,Bakery,5.0,3,critical,09:15,10:45,5

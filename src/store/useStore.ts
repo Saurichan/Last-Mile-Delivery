@@ -23,11 +23,19 @@ import {
   INITIAL_ORDERS,
   INITIAL_OPTIMIZATION_HISTORY,
   INITIAL_PRODUCTS,
+  DEMO_BUSINESSES,
+  DEMO_ORDERS_BY_BIZ,
 } from '../data/demoData';
 import { getDefaultRulesForType } from '../services/businessRules';
 import { optimizeRoute } from '../services/optimizer/optimizer';
 import { calculateSavingsComparison } from '../services/costCalculator';
 import { trackEvent, supabase, isSupabaseConfigured } from '../services/supabase';
+import {
+  fetchOrdersFromSupabase,
+  insertOrderToSupabase,
+  updateOrderInSupabase,
+  deleteOrderFromSupabase,
+} from '../services/orderService';
 
 interface DriverSimulationState {
   isPlaying: boolean;
@@ -83,6 +91,12 @@ interface AppStore {
   rescheduleOrder: (orderId: string, newDate: string, newTimeWindow?: { start: string; end: string }) => void;
   markOrderDelivered: (orderId: string, pod: ProofOfDelivery) => void;
   markOrderFailed: (orderId: string, reason: string, notes?: string, rescheduleDate?: string) => void;
+
+  // Supabase Order Synchronization
+  isSyncingOrders: boolean;
+  syncOrdersFromSupabase: () => Promise<void>;
+  upsertRealtimeOrder: (order: Order) => void;
+  removeRealtimeOrder: (id: string) => void;
 
   // Route Optimization
   currentRoutePlan: RoutePlan | null;
@@ -364,17 +378,45 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   setBusinessType: (type: BusinessType) => {
-    const currentBiz = get().business;
+    const preset = DEMO_BUSINESSES[type];
     const defaultRules = getDefaultRulesForType(type);
-    const updatedBiz: Business = {
-      ...currentBiz,
-      type,
-      rules: defaultRules,
+    const updatedBiz: Business = preset
+      ? { ...preset, rules: defaultRules }
+      : {
+          ...get().business,
+          type,
+          rules: defaultRules,
+        };
+
+    const newOrders = (DEMO_ORDERS_BY_BIZ && DEMO_ORDERS_BY_BIZ[type])
+      ? DEMO_ORDERS_BY_BIZ[type]
+      : get().orders;
+
+    // Update user profile with new business details
+    const currentUserProfile = get().userProfile;
+    const updatedProfile: UserProfile = {
+      ...currentUserProfile,
+      businessType: type,
+      businessName: updatedBiz.name,
+      businessLocation: updatedBiz.depot.address || 'Tumakuru, Karnataka',
+      city: 'Tumakuru',
+      state: 'Karnataka',
     };
-    set({ business: updatedBiz });
-    if (get().currentRoutePlan) {
+
+    set({
+      business: updatedBiz,
+      orders: newOrders,
+      userProfile: updatedProfile,
+      currentRoutePlan: null,
+      selectedOrderId: null,
+    });
+
+    trackEvent('business_created', { name: updatedBiz.name, type: updatedBiz.type });
+
+    // Automatically re-run optimization for the new business type's orders
+    setTimeout(() => {
       get().runOptimization();
-    }
+    }, 50);
   },
 
   updateBusinessRules: (newRules) => {
@@ -387,9 +429,10 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   addOrder: (orderData) => {
+    const tempId = `ord-${Date.now()}`;
     const newOrder: Order = {
       ...orderData,
-      id: `ord-${Date.now()}`,
+      id: tempId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -413,6 +456,20 @@ export const useStore = create<AppStore>((set, get) => ({
     });
 
     trackEvent('order_created', { orderNumber: newOrder.orderNumber, category: newOrder.category });
+
+    // Persist to Supabase asynchronously and replace local tempId with official UUID
+    insertOrderToSupabase(orderData)
+      .then((persistedOrder) => {
+        if (persistedOrder) {
+          set((state) => ({
+            orders: state.orders.map((o) => (o.id === tempId ? persistedOrder : o)),
+            selectedOrderId: state.selectedOrderId === tempId ? persistedOrder.id : state.selectedOrderId,
+          }));
+        }
+      })
+      .catch((err) => {
+        console.warn('Background Supabase order insert failed:', err);
+      });
   },
 
   updateOrder: (id, updates) => {
@@ -422,6 +479,9 @@ export const useStore = create<AppStore>((set, get) => ({
       ),
     }));
     trackEvent('order_updated', { orderId: id, updates });
+    updateOrderInSupabase(id, updates).catch((err) => {
+      console.warn('Background Supabase order update failed:', err);
+    });
   },
 
   deleteOrder: (id) => {
@@ -429,6 +489,9 @@ export const useStore = create<AppStore>((set, get) => ({
       orders: state.orders.filter((o) => o.id !== id),
       selectedOrderId: state.selectedOrderId === id ? null : state.selectedOrderId,
     }));
+    deleteOrderFromSupabase(id).catch((err) => {
+      console.warn('Background Supabase order delete failed:', err);
+    });
   },
 
   cancelOrder: (id) => {
@@ -438,6 +501,9 @@ export const useStore = create<AppStore>((set, get) => ({
       ),
     }));
     trackEvent('order_updated', { orderId: id, status: 'cancelled' });
+    updateOrderInSupabase(id, { status: 'cancelled' }).catch((err) => {
+      console.warn('Background Supabase order cancellation failed:', err);
+    });
   },
 
   clearAllOrders: () => {
@@ -450,11 +516,17 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   toggleLockStop: (orderId) => {
+    const target = get().orders.find((o) => o.id === orderId);
+    const newLockedState = target ? !target.isLocked : true;
+
     set((state) => ({
       orders: state.orders.map((o) =>
         o.id === orderId ? { ...o, isLocked: !o.isLocked } : o
       ),
     }));
+    updateOrderInSupabase(orderId, { isLocked: newLockedState }).catch((err) => {
+      console.warn('Background Supabase order lock update failed:', err);
+    });
   },
 
   rescheduleOrder: (orderId, newDate, newTimeWindow) => {
@@ -471,18 +543,26 @@ export const useStore = create<AppStore>((set, get) => ({
           : o
       ),
     }));
+    updateOrderInSupabase(orderId, {
+      status: 'rescheduled',
+      rescheduledDate: newDate,
+      timeWindow: newTimeWindow,
+    }).catch((err) => {
+      console.warn('Background Supabase order reschedule failed:', err);
+    });
   },
 
   markOrderDelivered: (orderId, pod) => {
+    const completedAt = new Date().toISOString();
     set((state) => {
       const updatedOrders = state.orders.map((o) =>
         o.id === orderId
           ? {
               ...o,
               status: 'delivered' as const,
-              completedAt: new Date().toISOString(),
+              completedAt,
               pod,
-              updatedAt: new Date().toISOString(),
+              updatedAt: completedAt,
             }
           : o
       );
@@ -500,6 +580,12 @@ export const useStore = create<AppStore>((set, get) => ({
       return { orders: updatedOrders, currentRoutePlan: updatedRoute };
     });
     trackEvent('delivery_completed', { orderId });
+    updateOrderInSupabase(orderId, {
+      status: 'delivered',
+      completedAt,
+    }).catch((err) => {
+      console.warn('Background Supabase order delivered update failed:', err);
+    });
   },
 
   markOrderFailed: (orderId, reason, notes, rescheduleDate) => {
@@ -518,6 +604,80 @@ export const useStore = create<AppStore>((set, get) => ({
       ),
     }));
     trackEvent('delivery_failed', { orderId, reason });
+    updateOrderInSupabase(orderId, {
+      status: 'failed',
+      failureReason: reason,
+      failureNotes: notes,
+      rescheduledDate: rescheduleDate,
+    }).catch((err) => {
+      console.warn('Background Supabase order failed update failed:', err);
+    });
+  },
+
+  // Supabase Order Synchronization
+  isSyncingOrders: false,
+
+  syncOrdersFromSupabase: async () => {
+    set({ isSyncingOrders: true });
+    try {
+      const dbOrders = await fetchOrdersFromSupabase();
+      if (dbOrders && dbOrders.length > 0) {
+        set((state) => {
+          // Merge customers
+          const customerMap = new Map<string, Customer>();
+          state.customers.forEach((c) => customerMap.set(c.id, c));
+          dbOrders.forEach((o) => {
+            if (o.customer && o.customer.id) {
+              customerMap.set(o.customer.id, o.customer);
+            }
+          });
+
+          return {
+            orders: dbOrders,
+            customers: Array.from(customerMap.values()),
+            isSyncingOrders: false,
+          };
+        });
+      } else {
+        set({ isSyncingOrders: false });
+      }
+    } catch (err) {
+      console.warn('syncOrdersFromSupabase error:', err);
+      set({ isSyncingOrders: false });
+    }
+  },
+
+  upsertRealtimeOrder: (order: Order) => {
+    set((state) => {
+      const exists = state.orders.some(
+        (o) => o.id === order.id || o.orderNumber === order.orderNumber
+      );
+      let updatedOrders: Order[];
+      if (exists) {
+        updatedOrders = state.orders.map((o) =>
+          o.id === order.id || o.orderNumber === order.orderNumber ? { ...o, ...order } : o
+        );
+      } else {
+        updatedOrders = [order, ...state.orders];
+      }
+
+      let updatedCustomers = state.customers;
+      if (order.customer && !updatedCustomers.some((c) => c.id === order.customer.id)) {
+        updatedCustomers = [order.customer, ...updatedCustomers];
+      }
+
+      return {
+        orders: updatedOrders,
+        customers: updatedCustomers,
+      };
+    });
+  },
+
+  removeRealtimeOrder: (id: string) => {
+    set((state) => ({
+      orders: state.orders.filter((o) => o.id !== id),
+      selectedOrderId: state.selectedOrderId === id ? null : state.selectedOrderId,
+    }));
   },
 
   runOptimization: async (algorithm = 'two_opt') => {
@@ -681,8 +841,9 @@ export const useStore = create<AppStore>((set, get) => ({
 
   addExpressOrder: async () => {
     const { business } = get();
+    const tempId = `ord-express-${Date.now()}`;
     const expressOrder: Order = {
-      id: `ord-express-${Date.now()}`,
+      id: tempId,
       orderNumber: `EXP-${Math.floor(100 + Math.random() * 900)}`,
       customer: {
         id: `cust-exp-${Date.now()}`,
@@ -710,6 +871,19 @@ export const useStore = create<AppStore>((set, get) => ({
 
     set((state) => ({ orders: [expressOrder, ...state.orders] }));
     trackEvent('order_created', { orderNumber: expressOrder.orderNumber, isExpress: true });
+
+    insertOrderToSupabase(expressOrder)
+      .then((persisted) => {
+        if (persisted) {
+          set((state) => ({
+            orders: state.orders.map((o) => (o.id === tempId ? persisted : o)),
+          }));
+        }
+      })
+      .catch((err) => {
+        console.warn('Background Supabase express order insert failed:', err);
+      });
+
     return expressOrder;
   },
 

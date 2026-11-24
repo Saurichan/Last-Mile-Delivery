@@ -85,19 +85,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNewOrder, onOpenRules, onO
       </div>
 
       {/* 2. Center: Location & Business Selector */}
-      <div className="hidden lg:flex items-center gap-2" ref={bizDropdownRef}>
+      <div className="flex items-center gap-2 relative" ref={bizDropdownRef}>
         <button
           onClick={() => setIsBizDropdownOpen(!isBizDropdownOpen)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F7F8F7] hover:bg-[#E8F6F1] dark:bg-[#33383F] dark:hover:bg-[#3A4048] border border-[#EAECEA] dark:border-[#495059] text-xs font-semibold text-[#292D32] dark:text-zinc-200 transition"
+          className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#F7F8F7] hover:bg-[#E8F6F1] dark:bg-[#33383F] dark:hover:bg-[#3A4048] border border-[#EAECEA] dark:border-[#495059] text-xs font-semibold text-[#292D32] dark:text-zinc-200 transition"
+          title="Switch Demo Business"
         >
-          <MapPin className="w-3.5 h-3.5 text-[#168E6A]" />
-          <span className="font-bold text-[#292D32] dark:text-white">{business?.name || 'Sweet Delights Bakery'}</span>
-          <span className="text-[#B4B6B7]">• Tumakuru, KA</span>
-          <ChevronDown className="w-3.5 h-3.5 text-[#B4B6B7]" />
+          <MapPin className="w-3.5 h-3.5 text-[#168E6A] shrink-0" />
+          <span className="font-bold text-[#292D32] dark:text-white truncate max-w-[100px] sm:max-w-[180px] md:max-w-[240px]">
+            {business?.name || 'Sweet Delights Bakery'}
+          </span>
+          <span className="text-[#B4B6B7] hidden md:inline">• Tumakuru, KA</span>
+          <ChevronDown className="w-3.5 h-3.5 text-[#B4B6B7] shrink-0" />
         </button>
 
         {isBizDropdownOpen && (
-          <div className="absolute top-12 left-1/2 -translate-x-1/2 mt-1 w-80 bg-white dark:bg-[#33383F] border border-[#EAECEA] dark:border-[#495059] rounded-2xl shadow-modal p-2 z-50 animate-fade-in">
+          <div className="absolute top-12 left-0 sm:left-1/2 sm:-translate-x-1/2 mt-1 w-72 sm:w-80 bg-white dark:bg-[#33383F] border border-[#EAECEA] dark:border-[#495059] rounded-2xl shadow-modal p-2 z-50 animate-fade-in">
             <div className="px-2.5 py-1.5 text-[11px] font-bold text-[#B4B6B7] uppercase tracking-wider">
               Switch Demo Business (Tumakuru)
             </div>

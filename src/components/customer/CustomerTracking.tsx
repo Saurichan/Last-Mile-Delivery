@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { DeliveryMap } from '../map/DeliveryMap';
 import {
@@ -17,6 +17,12 @@ export const CustomerTracking: React.FC = () => {
   const [selectedOrderId, setSelectedOrderId] = useState<string>(
     activeOrders[0]?.id || ''
   );
+
+  useEffect(() => {
+    if (activeOrders.length > 0 && !activeOrders.some(o => o.id === selectedOrderId)) {
+      setSelectedOrderId(activeOrders[0].id);
+    }
+  }, [orders, selectedOrderId]);
 
   const selectedOrder =
     orders.find((o) => o.id === selectedOrderId) || activeOrders[0] || orders[0];

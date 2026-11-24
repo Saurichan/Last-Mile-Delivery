@@ -21,8 +21,11 @@ export async function searchAddress(query: string): Promise<GeocodingResult[]> {
   }
 
   try {
-    const encoded = encodeURIComponent(trimmed);
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encoded}&limit=5&addressdetails=1`;
+    const hasTumakuru = /tumakuru|tumkur/i.test(trimmed);
+    const searchQuery = hasTumakuru ? trimmed : `${trimmed}, Tumakuru, Karnataka`;
+    const encoded = encodeURIComponent(searchQuery);
+    // Focus search exclusively to Tumakuru and surrounding region in Karnataka, India
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encoded}&countrycodes=in&viewbox=77.00,13.45,77.22,13.25&limit=6&addressdetails=1`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);

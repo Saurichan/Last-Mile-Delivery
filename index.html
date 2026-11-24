@@ -2,7 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23168E6A' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z'/><circle cx='12' cy='10' r='3'/></svg>" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'
+     stroke='%23168E6A' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z'/>
+     <circle cx='12' cy='10' r='3'/></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#168E6A" />
     <meta name="description" content="LAST-MILE DELIVERY ROUTE OPTIMIZER - Smart delivery planning for local businesses." />
@@ -12,6 +14,26 @@
     <script>
       window.__DEFINES__ = window.__DEFINES__ || {};
       globalThis.__DEFINES__ = globalThis.__DEFINES__ || {};
+    </script>
+    
+    <!-- Seamless VS Code Go Live / Static Server Detection -->
+    <script>
+      (function() {
+        var isViteDev = window.location.port === '3000';
+        var isDist = window.location.pathname.indexOf('/dist') !== -1;
+        // If not running under Vite dev server (e.g. VS Code Live Server on port 5500, or local static server)
+        if (!isViteDev && !isDist && (window.location.port === '5500' || window.location.port === '5501' || window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')) {
+          fetch('/@vite/client', { method: 'HEAD' })
+            .then(function(res) {
+              if (!res.ok) {
+                window.location.replace('./dist/index.html' + window.location.search + window.location.hash);
+              }
+            })
+            .catch(function() {
+              window.location.replace('./dist/index.html' + window.location.search + window.location.hash);
+            });
+        }
+      })();
     </script>
     
     <!-- Google Fonts: Plus Jakarta Sans -->
@@ -24,8 +46,10 @@
   </head>
   <body class="bg-[#F7F8F7] text-[#292D32] dark:bg-[#292D32] dark:text-[#F1F3F2] antialiased selection:bg-[#168E6A] selection:text-white min-h-screen overflow-x-hidden font-sans">
     <div id="root">
-      <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #F7F8F7; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; text-align: center; padding: 20px;">
-        <div style="width: 52px; height: 52px; border-radius: 18px; background: #168E6A; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(22, 142, 106, 0.25);">
+      <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #F7F8F7; font-family: 
+      'Plus Jakarta Sans', system-ui, sans-serif; text-align: center; padding: 20px;">
+        <div style="width: 52px; height: 52px; border-radius: 18px; background: #168E6A; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
+         box-shadow: 0 4px 14px rgba(22, 142, 106, 0.25);">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
           </svg>

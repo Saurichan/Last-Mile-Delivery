@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { saveUserProfileToSupabase, updateUserEmailWithVerification } from '../../services/authService';
 import { getUserInitials, getUserGreeting, formatUserTitle } from '../../utils/userProfile';
@@ -102,6 +102,32 @@ export const SettingsView: React.FC = () => {
     defaultStartTime: business.defaultStartTime || '08:30',
     fuelPricePerLiter: business.fuelPricePerLiter || 102.5,
   });
+
+  useEffect(() => {
+    setBizForm({
+      name: business.name || 'My Delivery Business',
+      type: business.type || ('bakery' as BusinessType),
+      tagline: business.tagline || '',
+      depotName: business.depot.name || 'Main Delivery Hub',
+      depotAddress: business.depot.address || 'Tumakuru, Karnataka',
+      defaultStartTime: business.defaultStartTime || '08:30',
+      fuelPricePerLiter: business.fuelPricePerLiter || 102.5,
+    });
+  }, [business]);
+
+  useEffect(() => {
+    setProfileForm((prev) => ({
+      ...prev,
+      name: userProfile.name || '',
+      role: userProfile.role || 'Business Owner',
+      email: userProfile.email || '',
+      phone: userProfile.phone || '',
+      avatarUrl: userProfile.avatarUrl || '',
+      city: userProfile.city || 'Tumakuru',
+      state: userProfile.state || 'Karnataka',
+      businessLocation: userProfile.businessLocation || business.depot.address || 'Tumakuru, Karnataka',
+    }));
+  }, [userProfile, business.depot.address]);
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { BusinessType } from '../../types';
 import { BUSINESS_TYPE_METADATA } from '../../services/businessRules';
@@ -25,8 +25,18 @@ export const BusinessRulesConfig: React.FC = () => {
     String(Math.round((business.maxRouteDurationMinutes || 300) / 60))
   );
   const [startTime, setStartTime] = useState(business.defaultStartTime || '08:30');
-
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    setName(business.name);
+    setTagline(business.tagline || '');
+    setDepotName(business.depot.name);
+    setDepotAddress(business.depot.address);
+    setCurrency(business.currency || '₹');
+    setFuelPrice(String(business.fuelPricePerLiter || 102.50));
+    setMaxDurationHours(String(Math.round((business.maxRouteDurationMinutes || 300) / 60)));
+    setStartTime(business.defaultStartTime || '08:30');
+  }, [business]);
 
   const handleBusinessTypeChange = (type: BusinessType) => {
     setBusinessType(type);
