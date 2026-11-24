@@ -17,6 +17,8 @@ import {
   XCircle,
   Truck,
   Zap,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 
 interface OrderListProps {
@@ -28,7 +30,7 @@ export const OrderList: React.FC<OrderListProps> = ({
   onOpenNewOrder,
   onEditOrder,
 }) => {
-  const { orders, deleteOrder, toggleLockStop, setSelectedOrderId, selectedOrderId } = useStore();
+  const { orders, deleteOrder, toggleLockStop, setSelectedOrderId, selectedOrderId, ordersError, isSyncingOrders } = useStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
@@ -137,6 +139,23 @@ export const OrderList: React.FC<OrderListProps> = ({
           Add Order
         </button>
       </div>
+
+      {/* Supabase Sync Error / Loading Banner */}
+      {ordersError && (
+        <div className="flex items-start gap-2 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-2xl text-xs text-rose-700 dark:text-rose-300">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold">Supabase Error:</span>{' '}
+            <span className="break-all">{ordersError}</span>
+          </div>
+        </div>
+      )}
+      {isSyncingOrders && (
+        <div className="flex items-center gap-2 p-2 text-xs text-[#B4B6B7]">
+          <RefreshCw className="w-3 h-3 animate-spin" />
+          Loading live orders from Supabase...
+        </div>
+      )}
 
       {/* Filter Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

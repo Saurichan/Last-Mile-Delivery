@@ -12,6 +12,8 @@ import {
   ChevronDown,
   User,
   Phone,
+  AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 
 interface OrderModalProps {
@@ -47,11 +49,16 @@ export const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, editOrd
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // Supabase operation state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   // Geocoding search state
   const [searchResults, setSearchResults] = useState<GeocodingResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
+    setSubmitError(null);
     if (editOrder) {
       setCustomerName(editOrder.customer.name);
       setPhone(editOrder.customer.phone);
@@ -119,7 +126,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, editOrd
     setSearchResults([]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName || !addressQuery) {
       alert('Please enter customer name and delivery address.');
@@ -147,8 +154,11 @@ export const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, editOrd
         isTemperatureSensitive,
         specialInstructions: specialInstructions || undefined,
       });
+      onClose();
     } else {
-      addOrder({
+      setIsSubmitting(true);
+      setSubmitError(null);
+      const { order: _newOrder, error } = await addOrder({
         orderNumber: `ORD-${Math.floor(100 + Math.random() * 900)}`,
         customer: {
           id: `c-${Date.now()}`,
@@ -170,9 +180,14 @@ export const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, editOrd
         isTemperatureSensitive,
         specialInstructions: specialInstructions || undefined,
       });
+      setIsSubmitting(false);
+      if (error) {
+        const msg = `Supabase error: ${error.message}${error.hint ? ` — Hint: ${error.hint}` : ''}${error.details ? ` Details: ${error.details}` : ''}`;
+        setSubmitError(msg);
+        return; // keep modal open so user can see the error
+      }
+      onClose();
     }
-
-    onClose();
   };
 
   if (!isOpen) return null;
@@ -201,6 +216,14 @@ export const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, editOrd
             </p>
           </div>
         </div>
+
+        {/* Supabase Error Banner */}
+        {submitError && (
+          <div className="flex items-start gap-2 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-2xl text-xs text-rose-700 dark:text-rose-300">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span className="font-medium break-all">{submitError}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-1">
           {/* STEP 1: Customer (Name, Phone) */}
@@ -410,9 +433,20 @@ export const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, editOrd
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-[#168E6A] hover:bg-[#127355] text-white rounded-xl text-xs font-black shadow-sm transition active:scale-95"
+              disabled={isSubmitting}
+              className="px-6 py-2.5 bg-[#168E6A] hover:bg-[#127355] disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black shadow-sm transition active:scale-95 flex items-center gap-1.5"
             >
-              {editOrder ? 'Save Changes' : 'Save Order'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving to Supabase...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  {editOrder ? 'Save Changes' : 'Save Order'}
+                </>
+              )}
             </button>
           </div>
         </form>

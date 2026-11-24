@@ -83,7 +83,7 @@ interface AppStore {
   deleteDriver: (id: string) => void;
 
   // Order CRUD
-  addOrder: (order: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addOrder: (order: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ order: Order | null; error: any }>;
   updateOrder: (id: string, updates: Partial<Order>) => void;
   deleteOrder: (id: string) => void;
   cancelOrder: (id: string) => void;
@@ -94,6 +94,7 @@ interface AppStore {
 
   // Supabase Order Synchronization
   isSyncingOrders: boolean;
+  ordersError: string | null;
   syncOrdersFromSupabase: () => Promise<void>;
   upsertRealtimeOrder: (order: Order) => void;
   removeRealtimeOrder: (id: string) => void;
@@ -154,11 +155,22 @@ function getInitialState() {
             ? parsed.business
             : defaultBiz;
 
-        const rawOrders = Array.isArray(parsed.orders) ? parsed.orders : INITIAL_ORDERS;
+        const rawOrders = Array.isArray(parsed.orders) ? parsed.orders : [];
+        // Filter out any mock orders from previous sessions
         const validOrders = rawOrders.filter(
-          (o: any) => o && o.customer && typeof o.customer.lat === 'number' && typeof o.customer.lng === 'number'
+          (o: any) =>
+            o &&
+            o.customer &&
+            typeof o.customer.lat === 'number' &&
+            typeof o.customer.lng === 'number' &&
+            !String(o.id).startsWith('ord-bak-') &&
+            !String(o.id).startsWith('ord-ph-') &&
+            !String(o.id).startsWith('ord-gr-') &&
+            !String(o.id).startsWith('ord-cr-') &&
+            !String(o.id).startsWith('ord-wt-') &&
+            !String(o.id).startsWith('ord-ld-')
         );
-        const orders = validOrders.length > 0 ? validOrders : INITIAL_ORDERS;
+        const orders = validOrders;
         const products = Array.isArray(parsed.products) && parsed.products.length > 0
           ? parsed.products
           : INITIAL_PRODUCTS;
@@ -206,7 +218,7 @@ function getInitialState() {
     business: defaultBiz,
     products: INITIAL_PRODUCTS,
     customers: [],
-    orders: INITIAL_ORDERS,
+    orders: [],
     drivers: INITIAL_DRIVERS,
     vehicles: DEFAULT_VEHICLES,
     selectedVehicleId: 'veh-1',
@@ -388,9 +400,7 @@ export const useStore = create<AppStore>((set, get) => ({
           rules: defaultRules,
         };
 
-    const newOrders = (DEMO_ORDERS_BY_BIZ && DEMO_ORDERS_BY_BIZ[type])
-      ? DEMO_ORDERS_BY_BIZ[type]
-      : get().orders;
+    const newOrders = get().orders;
 
     // Update user profile with new business details
     const currentUserProfile = get().userProfile;
@@ -438,7 +448,6 @@ export const useStore = create<AppStore>((set, get) => ({
     };
 
     set((state) => {
-      // Auto register customer if new
       let updatedCustomers = state.customers;
       if (newOrder.customer && newOrder.customer.name) {
         const exists = updatedCustomers.some(
@@ -452,23 +461,36 @@ export const useStore = create<AppStore>((set, get) => ({
       return {
         orders: [newOrder, ...state.orders],
         customers: updatedCustomers,
+        ordersError: null,
       };
     });
 
     trackEvent('order_created', { orderNumber: newOrder.orderNumber, category: newOrder.category });
 
-    // Persist to Supabase asynchronously and replace local tempId with official UUID
-    insertOrderToSupabase(orderData)
-      .then((persistedOrder) => {
+    // Persist to Supabase and replace tempId with real UUID; surface any error
+    return insertOrderToSupabase(orderData)
+      .then(({ order: persistedOrder, error }) => {
+        if (error) {
+          const msg = `Supabase insert error: [${error.code || ''}] ${error.message}${error.hint ? ` — Hint: ${error.hint}` : ''}${error.details ? ` Details: ${error.details}` : ''}`;
+          console.error('[addOrder Supabase Error]', msg, error);
+          set({ ordersError: msg });
+          return { order: null, error };
+        }
         if (persistedOrder) {
           set((state) => ({
             orders: state.orders.map((o) => (o.id === tempId ? persistedOrder : o)),
             selectedOrderId: state.selectedOrderId === tempId ? persistedOrder.id : state.selectedOrderId,
+            ordersError: null,
           }));
+          console.log('[addOrder] Persisted to Supabase:', persistedOrder.id, persistedOrder.orderNumber);
         }
+        return { order: persistedOrder, error: null };
       })
       .catch((err) => {
-        console.warn('Background Supabase order insert failed:', err);
+        const msg = `Unexpected exception during Supabase insert: ${err?.message || err}`;
+        console.error('[addOrder Exception]', msg);
+        set({ ordersError: msg });
+        return { order: null, error: { message: msg } };
       });
   },
 
@@ -616,14 +638,20 @@ export const useStore = create<AppStore>((set, get) => ({
 
   // Supabase Order Synchronization
   isSyncingOrders: false,
+  ordersError: null as string | null,
 
   syncOrdersFromSupabase: async () => {
-    set({ isSyncingOrders: true });
+    set({ isSyncingOrders: true, ordersError: null });
     try {
-      const dbOrders = await fetchOrdersFromSupabase();
+      const { orders: dbOrders, error } = await fetchOrdersFromSupabase();
+      if (error) {
+        const msg = `Supabase fetch error: [${error.code || ''}] ${error.message}${error.hint ? ` — Hint: ${error.hint}` : ''}`;
+        console.error('[syncOrdersFromSupabase Error]', msg, error);
+        set({ isSyncingOrders: false, ordersError: msg });
+        return;
+      }
       if (dbOrders && dbOrders.length > 0) {
         set((state) => {
-          // Merge customers
           const customerMap = new Map<string, Customer>();
           state.customers.forEach((c) => customerMap.set(c.id, c));
           dbOrders.forEach((o) => {
@@ -631,19 +659,22 @@ export const useStore = create<AppStore>((set, get) => ({
               customerMap.set(o.customer.id, o.customer);
             }
           });
-
           return {
             orders: dbOrders,
             customers: Array.from(customerMap.values()),
             isSyncingOrders: false,
+            ordersError: null,
           };
         });
+        console.log(`[syncOrdersFromSupabase] Loaded ${dbOrders.length} live orders from Supabase`);
       } else {
-        set({ isSyncingOrders: false });
+        set({ isSyncingOrders: false, ordersError: null });
+        console.log('[syncOrdersFromSupabase] No orders found in Supabase');
       }
-    } catch (err) {
-      console.warn('syncOrdersFromSupabase error:', err);
-      set({ isSyncingOrders: false });
+    } catch (err: any) {
+      const msg = `Exception during sync: ${err?.message || err}`;
+      console.error('[syncOrdersFromSupabase Exception]', msg);
+      set({ isSyncingOrders: false, ordersError: msg });
     }
   },
 
@@ -873,8 +904,10 @@ export const useStore = create<AppStore>((set, get) => ({
     trackEvent('order_created', { orderNumber: expressOrder.orderNumber, isExpress: true });
 
     insertOrderToSupabase(expressOrder)
-      .then((persisted) => {
-        if (persisted) {
+      .then(({ order: persisted, error }) => {
+        if (error) {
+          console.warn('[createExpressOrder] Supabase insert failed:', error.message);
+        } else if (persisted) {
           set((state) => ({
             orders: state.orders.map((o) => (o.id === tempId ? persisted : o)),
           }));

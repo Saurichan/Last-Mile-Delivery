@@ -98,11 +98,23 @@ export function mapRowToOrder(row: any): Order {
   };
 }
 
+export interface SupabaseErrorObject {
+  message: string;
+  code?: string;
+  details?: string | null;
+  hint?: string | null;
+}
+
 /**
  * Fetches all orders from Supabase with joined customer details
  */
-export async function fetchOrdersFromSupabase(): Promise<Order[]> {
-  if (!supabase || !isSupabaseConfigured) return [];
+export async function fetchOrdersFromSupabase(): Promise<{ orders: Order[]; error: SupabaseErrorObject | null }> {
+  if (!supabase || !isSupabaseConfigured) {
+    return {
+      orders: [],
+      error: { message: 'Supabase client is not configured or missing credentials in .env' },
+    };
+  }
 
   try {
     const { data, error } = await supabase
@@ -148,15 +160,30 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn('Failed to fetch orders from Supabase:', error.message);
-      return [];
+      console.error('[Supabase Fetch Orders Error]:', error);
+      return {
+        orders: [],
+        error: {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        },
+      };
     }
 
-    if (!data) return [];
-    return data.map(mapRowToOrder);
-  } catch (err) {
-    console.warn('fetchOrdersFromSupabase exception:', err);
-    return [];
+    if (!data) return { orders: [], error: null };
+    const mapped = data.map(mapRowToOrder);
+    console.log(`[Supabase Fetch Orders]: Successfully loaded ${mapped.length} live orders from public.orders`);
+    return { orders: mapped, error: null };
+  } catch (err: any) {
+    console.error('[Supabase fetchOrdersFromSupabase exception]:', err);
+    return {
+      orders: [],
+      error: {
+        message: err?.message || 'Unexpected exception while fetching orders',
+      },
+    };
   }
 }
 
@@ -188,8 +215,12 @@ export async function fetchOrderById(orderId: string): Promise<Order | null> {
  */
 export async function insertOrderToSupabase(
   orderInput: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>
-): Promise<Order | null> {
-  if (!supabase || !isSupabaseConfigured) return null;
+): Promise<{ order: Order | null; error: SupabaseErrorObject | null }> {
+  if (!supabase || !isSupabaseConfigured) {
+    const err = { message: 'Supabase is not configured. Check your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.' };
+    console.error('[Supabase Insert Error]:', err);
+    return { order: null, error: err };
+  }
 
   try {
     const businessId = await getActiveBusinessId();
@@ -213,7 +244,16 @@ export async function insertOrderToSupabase(
       .single();
 
     if (custError) {
-      console.warn('Failed to insert customer into Supabase:', custError.message);
+      console.error('[Supabase Customer Insert Error]:', custError);
+      return {
+        order: null,
+        error: {
+          message: `Customer insert failed: ${custError.message}`,
+          code: custError.code,
+          details: custError.details,
+          hint: custError.hint,
+        },
+      };
     } else if (custData) {
       customerId = custData.id;
     }
@@ -250,14 +290,30 @@ export async function insertOrderToSupabase(
       .single();
 
     if (orderError) {
-      console.error('Failed to insert order into Supabase:', orderError.message);
-      return null;
+      console.error('[Supabase Order Insert Error]:', orderError);
+      return {
+        order: null,
+        error: {
+          message: `Order insert failed: ${orderError.message}`,
+          code: orderError.code,
+          details: orderError.details,
+          hint: orderError.hint,
+        },
+      };
     }
 
-    return mapRowToOrder(orderData);
-  } catch (err) {
-    console.error('insertOrderToSupabase exception:', err);
-    return null;
+    const createdOrder = mapRowToOrder(orderData);
+    console.log('[Supabase Order Insert Success]:', createdOrder);
+    return { order: createdOrder, error: null };
+  } catch (err: any) {
+    console.error('[Supabase insertOrderToSupabase Exception]:', err);
+    return {
+      order: null,
+      error: {
+        message: err?.message || 'Exception occurred during Supabase order insertion',
+        details: err?.stack || null,
+      },
+    };
   }
 }
 
